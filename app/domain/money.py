@@ -23,7 +23,9 @@ import string
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
-__all__ = ["AssetSymbol", "Money", "parse_decimal"]
+from app.domain.known import Maybe, NotApplicableType, UnknownType
+
+__all__ = ["AssetSymbol", "Money", "parse_decimal", "parse_maybe_decimal"]
 
 # Exchange asset codes are upper-case alphanumerics; a few legitimately contain
 # a separator (e.g. leveraged-token style codes). No asset names are enumerated.
@@ -71,6 +73,19 @@ def parse_decimal(value: object, *, field: str = "value") -> Decimal:
     if not parsed.is_finite():
         raise ValueError(f"{field}: {parsed} is not a finite decimal value")
     return parsed
+
+
+def parse_maybe_decimal(value: object, *, field: str) -> Maybe[Decimal]:
+    """Apply :func:`parse_decimal` to a value that may legitimately be missing.
+
+    ``UNKNOWN`` and ``NOT_APPLICABLE`` pass through untouched — they are the
+    correct representation of unverifiable data and must never be coerced into a
+    number (AGENTS.md §63). Anything else goes through the normal Decimal gate,
+    so a ``float`` is rejected whether or not the field was optional.
+    """
+    if isinstance(value, (UnknownType, NotApplicableType)):
+        return value
+    return parse_decimal(value, field=field)
 
 
 @dataclass(frozen=True, slots=True)

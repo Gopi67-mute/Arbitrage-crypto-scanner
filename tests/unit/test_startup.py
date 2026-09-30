@@ -62,7 +62,7 @@ def test_startup_report_states_read_only_mode_and_phase(isolated_env):
     report = "\n".join(build_startup_report(Settings()))
 
     assert "READ-ONLY" in report
-    assert "PHASE 0" in report
+    assert "PHASE 1" in report
     assert "no exchange API call was made" in report
     assert "INITIAL_CAPITAL_INR=1000 (Decimal)" in report
 
@@ -123,11 +123,19 @@ def test_startup_opens_no_network_connection(isolated_env, monkeypatch):
     assert main() == 0
 
 
-def test_no_exchange_adapter_module_exists_yet():
-    """Phase 0 must not contain an exchange implementation."""
-    modules = sorted(path.name for path in (PROJECT_ROOT / "app" / "exchanges").glob("*.py"))
+def test_startup_still_makes_no_exchange_call_in_phase_1(isolated_env):
+    """Phase 1 adds the adapter *contract*; the entry point still calls no venue.
 
-    assert modules == ["__init__.py"]
+    This replaces the Phase 0 assertion that ``app/exchanges/`` contained only
+    ``__init__.py``, which Phase 1 intentionally invalidates by adding
+    ``base.py``, ``capabilities.py`` and ``errors.py``. The property that
+    actually mattered — no venue implementation and no API call — is preserved
+    here and, more strictly, in ``tests/unit/test_exchange_adapter.py``.
+    """
+    report = "\n".join(build_startup_report(Settings()))
+
+    assert "no exchange API call was made" in report
+    assert "exchange adapters implemented: 0" in report
 
 
 def test_entry_point_does_not_import_an_http_client():

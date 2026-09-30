@@ -11,18 +11,43 @@ Rules for everything in this package:
 The permitted inward dependency is ``app.core.errors``, which imports nothing
 itself and therefore cannot create a cycle.
 
-Modules present in Phase 0
---------------------------
+Modules present
+---------------
+Phase 0 — the financial primitives:
+
 ``money``
-    ``parse_decimal``, ``AssetSymbol``, ``Money`` — the Decimal boundary.
+    ``parse_decimal``, ``parse_maybe_decimal``, ``AssetSymbol``, ``Money`` —
+    the Decimal boundary.
 ``known``
     ``UNKNOWN`` / ``NOT_APPLICABLE`` sentinels enforcing the
     UNKNOWN-is-not-ZERO rule.
 
-Modules deliberately absent in Phase 0
---------------------------------------
-``market``, ``route``, ``opportunity`` and the order-book, fee, tax and
-transfer models are NOT defined yet. Their shape is determined by the real
-exchange payloads discovered in Phases 2-6; writing them now would mean
-committing to speculative fields. See ``docs/decisions/0002-phase-0-domain-scope.md``.
+Phase 1 — the vocabulary the exchange adapter contract is expressed in:
+
+``exchange``
+    ``ExchangeId``, ``MarketRef`` — venue and market *identity*.
+``provenance``
+    ``DataSource``, ``DataProvenance`` — where a value came from, and when.
+``marketdata``
+    ``Ticker``, ``OrderBook``, ``OrderBookLevel``.
+``fees``
+    ``TradingFees`` as a venue reports them.
+``transfer``
+    ``NetworkInfo``, ``DepositInfo``, ``WithdrawalInfo``, keyed by asset AND
+    network.
+
+Every Phase 1 model above states only what a venue *reported*, with provenance,
+and uses ``Maybe[...]`` for anything it may not report. None of them applies a
+cost, decides executability or encodes a venue-specific payload shape.
+
+Modules still deliberately absent
+---------------------------------
+``market`` (precision, status, limits, minimum notional), ``route`` and
+``opportunity``. Their fields are determined by the real exchange payloads
+discovered in Phases 2-6, and by how three different status and precision
+vocabularies reconcile; writing them now would mean committing to speculative
+fields. ``MarketRef`` is identity only, and Phase 6's ``MarketDefinition`` will
+wrap it rather than replace it. See
+``docs/decisions/0002-phase-0-domain-scope.md`` and
+``docs/decisions/0003-phase-1-exchange-abstraction.md``.
 """

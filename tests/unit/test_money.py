@@ -6,7 +6,8 @@ from decimal import Decimal
 
 import pytest
 
-from app.domain.money import AssetSymbol, Money, parse_decimal
+from app.domain.known import NOT_APPLICABLE, UNKNOWN
+from app.domain.money import AssetSymbol, Money, parse_decimal, parse_maybe_decimal
 
 INR = AssetSymbol("INR")
 USDT = AssetSymbol("USDT")
@@ -173,3 +174,27 @@ def test_money_is_immutable():
 
 def test_money_str_names_the_currency():
     assert str(Money(Decimal("1234.50"), INR)) == "1234.50 INR"
+
+
+# --------------------------------------------------------------------------- #
+# parse_maybe_decimal — the optional-field gate used by the Phase 1 models
+# --------------------------------------------------------------------------- #
+def test_parse_maybe_decimal_parses_a_present_value_exactly():
+    assert parse_maybe_decimal("0.0001", field="withdrawal_fee") == Decimal("0.0001")
+
+
+def test_parse_maybe_decimal_passes_sentinels_through_untouched():
+    """A missing value stays missing; it is never coerced into a number."""
+    assert parse_maybe_decimal(UNKNOWN, field="withdrawal_fee") is UNKNOWN
+    assert parse_maybe_decimal(NOT_APPLICABLE, field="tds") is NOT_APPLICABLE
+
+
+def test_parse_maybe_decimal_still_rejects_float_for_an_optional_field():
+    """Optionality must not become a loophole in the Decimal rule."""
+    with pytest.raises(ValueError, match="float is forbidden"):
+        parse_maybe_decimal(0.001, field="maker_rate")
+
+
+def test_parse_maybe_decimal_preserves_a_verified_zero():
+    assert parse_maybe_decimal("0", field="withdrawal_fee") == Decimal("0")
+    assert parse_maybe_decimal("0", field="withdrawal_fee") is not UNKNOWN

@@ -13,4 +13,4 @@ __version__ = "0.1.0"
 
 APP_NAME = "Crypto Arbitrage Scanner"
 
-CURRENT_PHASE = "PHASE 0 — project setup + architecture foundation"
+CURRENT_PHASE = "PHASE 1 — exchange abstraction"

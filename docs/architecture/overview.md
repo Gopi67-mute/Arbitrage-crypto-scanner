@@ -3,8 +3,8 @@
 Normative source: [AGENTS.md](../../AGENTS.md). This document explains the
 layering the code establishes and why the boundaries sit where they do.
 
-Status: written in Phase 0. Layers below Phase 0 are described as intent, not as
-existing code.
+Status: written in Phase 0, updated in Phase 1. Layers beyond the current phase
+are described as intent, not as existing code.
 
 ---
 
@@ -55,6 +55,29 @@ engine.
 This is also why CCXT is not used. A generic wrapper normalises away exactly the
 deposit/withdrawal/network/minimum metadata that decides whether a route is
 actually executable.
+
+### The adapter contract (Phase 1)
+
+`app/exchanges/base.py` defines `ExchangeAdapter`: seven `async` read-only
+operations — `discover_markets`, `get_ticker`, `get_order_book`,
+`get_trading_fees`, `get_network_info`, `get_deposit_info`,
+`get_withdrawal_info` — plus an exchange identity and a declared capability set.
+
+Three rules give the contract its shape, and [ADR 0003](../decisions/0003-phase-1-exchange-abstraction.md)
+records why:
+
+- **Async**, because a route's two legs must be sampled inside one bounded
+  freshness window; sequential I/O widens that window by the sum of three
+  venues' latencies.
+- **Capabilities are explicit.** An operation a venue cannot serve raises
+  `UnsupportedCapabilityError` — distinct from a value that could not be
+  verified (`UNKNOWN`) and from one that does not apply (`NOT_APPLICABLE`).
+- **Read-only, permanently.** No method places or cancels an order, withdraws,
+  deposits, transfers or reads a balance. `get_deposit_info` and
+  `get_withdrawal_info` are reads *about* transfer constraints; they move
+  nothing. The test suite asserts the class's entire public surface.
+
+No venue implements it yet. Phases 2–4 add CoinDCX, KuCoin and Binance.
 
 ---
 
@@ -184,7 +207,10 @@ Introduced only by the phase that needs them:
 
 | Deferred | Reason |
 |---|---|
-| `domain/market.py`, `route.py`, `opportunity.py` | fields are determined by real exchange payloads (Phases 2–6); see [ADR 0002](../decisions/0002-phase-0-domain-scope.md) |
+| `MarketDefinition` (precision, status, limits), `route.py`, `opportunity.py` | fields are determined by real exchange payloads (Phases 2–6); see [ADR 0002](../decisions/0002-phase-0-domain-scope.md). Phase 1's `MarketRef` is identity only, and Phase 6 will wrap it rather than replace it |
+| Cross-venue network normalisation | `NetworkInfo.network` holds the venue's own code. Deciding that two venues' spellings denote the same chain is Phase 9's job |
+| Adapter lifecycle (`close()` / async context manager) | Phase 1 owns no resources; whether the HTTP client is owned or injected is a Phase 2 decision |
+| `REQUEST_TIMEOUT_SECONDS`, `MAX_RETRIES` | the Phase 1 contract performs no I/O; Phase 2 adds them with values justified against a real endpoint |
 | Fee, tax, transfer models | require verified live data and cited sources |
 | Order-book simulator, slippage, route, profit engines | Phases 12–15 |
 | WebSockets | REST suffices; not "more advanced", just different trade-offs |

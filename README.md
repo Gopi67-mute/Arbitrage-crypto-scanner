@@ -66,12 +66,31 @@ exchange is ever preferred by default — the market data decides.
 
 ## Current phase
 
-**PHASE 0 — project setup + architecture foundation.**
+**PHASE 1 — exchange abstraction.**
 
-Phase 0 contains **no exchange integration, no market data, and no arbitrage
-calculation**. What exists today is configuration, logging, the error boundary,
-the Decimal foundation, package boundaries, the test harness and an entry point
-that starts up and exits.
+Phase 1 adds the `ExchangeAdapter` contract that CoinDCX, KuCoin and Binance
+will implement, and the domain vocabulary it is expressed in. It contains
+**no exchange integration, no market data, and no arbitrage calculation**: no
+venue is implemented, no HTTP request is made, and no credential exists.
+
+On top of the Phase 0 foundation (configuration, logging, error boundary,
+Decimal primitives) there is now:
+
+| Module | Contents |
+|---|---|
+| `app/exchanges/base.py` | `ExchangeAdapter` — seven `async` read-only operations |
+| `app/exchanges/capabilities.py` | `ExchangeCapability` — what an adapter declares it can answer |
+| `app/exchanges/errors.py` | the failures an adapter may raise |
+| `app/domain/exchange.py` | `ExchangeId`, `MarketRef` — venue and market identity |
+| `app/domain/provenance.py` | `DataSource`, `DataProvenance` — where a value came from, and when |
+| `app/domain/marketdata.py` | `Ticker`, `OrderBook`, `OrderBookLevel` |
+| `app/domain/fees.py` | `TradingFees` as a venue reports them |
+| `app/domain/transfer.py` | `NetworkInfo`, `DepositInfo`, `WithdrawalInfo` — keyed by asset **and** network |
+
+Design rationale is in
+[ADR 0003](docs/decisions/0003-phase-1-exchange-abstraction.md): why the
+interface is async, how capabilities stay distinct from unknown data, and which
+models are still deferred to the phase that can define them from real payloads.
 
 See [Planned phases](#planned-phases) for the roadmap.
 
@@ -84,7 +103,7 @@ See [Planned phases](#planned-phases) for the roadmap.
 | Language | Python 3.12+ (developed on 3.14) |
 | Models / validation | Pydantic 2 |
 | Configuration | pydantic-settings |
-| HTTP transport | httpx *(declared for Phase 1+; not yet imported)* |
+| HTTP transport | httpx *(declared for Phase 2+; not yet imported)* |
 | Tests | pytest, pytest-asyncio |
 | Lint | Ruff |
 | Types | mypy (strict) |
@@ -125,8 +144,8 @@ cp .env.example .env          # macOS / Linux
 ```
 
 `.env` is git-ignored and must never be committed. **No API credentials are
-required** — Phase 0 defines no credential settings at all, and the scanner is
-built around public read-only endpoints.
+required** — no credential setting exists anywhere in the project, and the
+scanner is built around public read-only endpoints.
 
 ### Run it
 
@@ -138,7 +157,7 @@ Expected output (to stderr, so stdout stays free for reports):
 
 ```
 2026-09-30T15:32:10+0530 INFO     app.main :: [STARTUP] Crypto Arbitrage Scanner v0.1.0
-2026-09-30T15:32:10+0530 INFO     app.main :: [STARTUP] phase: PHASE 0 — project setup + architecture foundation
+2026-09-30T15:32:10+0530 INFO     app.main :: [STARTUP] phase: PHASE 1 — exchange abstraction
 2026-09-30T15:32:10+0530 INFO     app.main :: [STARTUP] mode: READ-ONLY — no orders, no deposits, no withdrawals, no transfers
 2026-09-30T15:32:10+0530 INFO     app.main :: [CONFIG] APP_ENV=development
 2026-09-30T15:32:10+0530 INFO     app.main :: [CONFIG] LOG_LEVEL=INFO
@@ -204,8 +223,8 @@ assumption.
 
 ```
         ┌───────────────────────────────────────────────┐
-        │  app/exchanges/   CoinDCX · KuCoin · Binance  │  ← all venue-specific
-        │                   adapters (Phase 2-4)        │    API knowledge
+        │  app/exchanges/   ExchangeAdapter contract    │  ← all venue-specific
+        │   CoinDCX · KuCoin · Binance  (Phase 2-4)     │    API knowledge
         └───────────────────────────────────────────────┘
         ┌──────────────┬──────────────┬─────────────────┐
         │  app/fees/   │  app/tax/    │  app/transfers/ │  ← cost + constraint
@@ -249,15 +268,20 @@ discover markets → normalise → validate route → validate network
 | `app/config.py` | `Settings`, `load_settings()`, `FinancialDecimal` |
 | `app/core/errors.py` | `ApplicationError` → `ConfigurationError`, `ExchangeError`, `DataError`, `ValidationError` |
 | `app/core/logging.py` | `configure_logging()`, `get_logger()`, `LogLevel` |
-| `app/domain/money.py` | `parse_decimal()`, `AssetSymbol`, `Money` |
+| `app/domain/money.py` | `parse_decimal()`, `parse_maybe_decimal()`, `AssetSymbol`, `Money` |
 | `app/domain/known.py` | `UNKNOWN`, `NOT_APPLICABLE`, `is_known()`, `require_known()` |
+| `app/domain/` (Phase 1) | `exchange.py`, `provenance.py`, `marketdata.py`, `fees.py`, `transfer.py` |
+| `app/exchanges/` (Phase 1) | `base.py`, `capabilities.py`, `errors.py` — the contract, no venue |
 | `app/main.py` | `main()`, `validate_startup()`, `build_startup_report()` |
-| `app/exchanges/`, `app/services/`, `app/fees/`, `app/tax/`, `app/transfers/` | Documented boundaries only — no implementation |
+| `app/services/`, `app/fees/`, `app/tax/`, `app/transfers/` | Documented boundaries only — no implementation |
 
-`app/domain/market.py`, `route.py` and `opportunity.py` do **not** exist yet.
-Their fields are determined by the real exchange payloads discovered in Phases
-2–6; writing them now would mean committing to invented structure. See
-[docs/decisions/0002-phase-0-domain-scope.md](docs/decisions/0002-phase-0-domain-scope.md).
+A `MarketDefinition` (precision, status, limits, minimum notional), `route.py`
+and `opportunity.py` do **not** exist yet. Their fields are determined by the
+real exchange payloads discovered in Phases 2–6; writing them now would mean
+committing to invented structure. Phase 1's `MarketRef` carries market
+*identity* only, and Phase 6 will wrap it rather than replace it. See
+[ADR 0002](docs/decisions/0002-phase-0-domain-scope.md) and
+[ADR 0003](docs/decisions/0003-phase-1-exchange-abstraction.md).
 
 ---
 
@@ -321,8 +345,8 @@ and nothing unrelated was changed — not merely when the code runs.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **0** | Project initialization + architecture foundation | **current** |
-| 1 | Exchange abstraction | planned |
+| 0 | Project initialization + architecture foundation | complete |
+| **1** | Exchange abstraction | **current** |
 | 2 | CoinDCX adapter | planned |
 | 3 | KuCoin adapter | planned |
 | 4 | Binance adapter | planned |
@@ -375,7 +399,7 @@ that needs them.
 │   ├── config.py             typed settings (pydantic-settings)
 │   ├── core/                 logging, errors
 │   ├── domain/               pure Decimal-based models
-│   ├── exchanges/            adapters (Phase 2-4)
+│   ├── exchanges/            adapter contract (Phase 1); venues (Phase 2-4)
 │   ├── services/             orchestration (Phase 5+)
 │   ├── fees/                 fee models (Phase 8-9)
 │   ├── tax/                  TDS / tax policy (Phase 11)
@@ -385,5 +409,5 @@ that needs them.
 │   └── decisions/            architecture decision records
 └── tests/
     ├── unit/                 deterministic, no network
-    └── integration/          live read-only tests (empty in Phase 0)
+    └── integration/          live read-only tests (still empty)
 ```

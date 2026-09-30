@@ -73,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     if argv:
         print(
-            f"{APP_NAME}: no command-line arguments are accepted in Phase 0; "
+            f"{APP_NAME}: no command-line arguments are accepted yet; "
             f"got {list(argv)!r}",
             file=sys.stderr,
         )
