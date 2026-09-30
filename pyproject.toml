@@ -1,0 +1,99 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-arbitrage-scanner"
+description = "Read-only cross-exchange crypto arbitrage intelligence scanner (CoinDCX, KuCoin, Binance)."
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["version"]
+
+# Runtime baseline for the scanner.
+#   pydantic / pydantic-settings : typed domain + typed configuration
+#   httpx                        : the sanctioned HTTP transport for the exchange
+#                                  adapters added in Phase 1+. Declared here to
+#                                  pin the baseline; NOT imported by Phase 0 code.
+dependencies = [
+    "pydantic>=2.13",
+    "pydantic-settings>=2.15",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "ruff>=0.16",
+    "mypy>=2.3",
+]
+
+[project.scripts]
+arbitrage-scanner = "app.main:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "app.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+# --------------------------------------------------------------------------- #
+# Tests
+# --------------------------------------------------------------------------- #
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+# `-m "not live"` keeps the default run fully deterministic: nothing in a normal
+# `pytest` invocation is allowed to contact a real exchange API.
+addopts = "-ra --strict-markers --strict-config -m 'not live'"
+markers = [
+    "live: test contacts a real exchange API over the network (deselected by default; run with `pytest -m live`)",
+]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+
+# --------------------------------------------------------------------------- #
+# Lint
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "ANN",  # missing annotations
+    "RUF",  # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test bodies stay readable; annotations are enforced on application code.
+"tests/**" = ["ANN"]
+
+# --------------------------------------------------------------------------- #
+# Types
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+strict = true
+plugins = ["pydantic.mypy"]
+show_error_codes = true
+pretty = true
+
+[tool.pydantic-mypy]
+init_typed = true
+warn_required_dynamic_aliases = true
